@@ -10,6 +10,7 @@
       font-family: Arial, sans-serif;
       padding: 20px;
       margin: 0;
+      padding-bottom: 100px; /* altura do footer */
     }
 	
     
@@ -31,6 +32,12 @@
       gap: 15px;
       margin-top: 20px;
     }
+
+.achievement-timestamp {
+  font-size: 0.8rem;
+  color: #aaa;
+  margin-top: 6px;
+}
 
 
 .game-card {
@@ -118,13 +125,14 @@ footer {
   bottom: 0;
   left: 0;
   width: 100%;
-  background: #1a1a1a;
-  border-top: 1px solid #333;
-  padding: 10px 0;
+  background: #222;
+  color: white;
   text-align: center;
-  z-index: 100;
-  box-shadow: 0 -2px 5px rgba(0,0,0,0.5);
+  padding: 10px 0 0 0;
+  height: 45px;
+  z-index: 10;
 }
+
 
 #exportBtn,
 #importLabel {
@@ -177,32 +185,35 @@ footer {
     const conquistasPorJogo = {};
 
     ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        const appID = data.appID;
-        const game = data.game;
+  try {
+    const data = JSON.parse(event.data);
+    console.log("📩 Mensagem recebida via WebSocket:", data);
+    const appID = data.appID;
+    const game = data.game;
 
-        if (!conquistasPorJogo[appID]) {
-          conquistasPorJogo[appID] = {
-            game,
-            icon: data.icon,
-            conquistas: []
-          };
-          renderGames();
-        }
+    if (!conquistasPorJogo[appID]) {
+      conquistasPorJogo[appID] = {
+        game,
+        icon: data.icon,
+        conquistas: []
+      };
+      renderGames();
+    }
 
-        conquistasPorJogo[appID].conquistas.push(data);
+    conquistasPorJogo[appID].conquistas.push(data);
+    salvarLocal(); // Salva localmente após novo dado
 
-        if (
-          achievementView.style.display === "grid" &&
-          achievementView.dataset.appID === String(appID)
-        ) {
-          renderConquistas(appID);
-        }
-      } catch (e) {
-        console.error("Erro ao processar conquista:", e);
-      }
-    };
+    if (
+      achievementView.style.display === "grid" &&
+      achievementView.dataset.appID === String(appID)
+    ) {
+      renderConquistas(appID);
+    }
+  } catch (e) {
+    console.error("Erro ao processar conquista:", e);
+  }
+};
+
 
     function renderGames() {
       gameView.innerHTML = "";
@@ -238,17 +249,21 @@ function renderConquistas(appID) {
   const jogo = conquistasPorJogo[appID];
   const container = achievementView;
 
-  container.innerHTML = ""; // 👈 Limpamos as conquistas anteriores
+  // Limpa tudo antes de renderizar novamente
+  container.innerHTML = "";
 
-  const conquistasAdicionadas = new Set();
+  // Ordena as conquistas por tempo de chegada (mais recentes primeiro)
+  const conquistasOrdenadas = [...jogo.conquistas].reverse(); 
 
-  jogo.conquistas.forEach(data => {
-    // Evita duplicadas dentro do mesmo render
-    if (conquistasAdicionadas.has(data.achievement)) return;
-    conquistasAdicionadas.add(data.achievement);
+  const conquistasRenderizadas = new Set();
+
+  conquistasOrdenadas.forEach(data => {
+    // Impede duplicatas (caso venham conquistas repetidas do WebSocket)
+    if (conquistasRenderizadas.has(data.achievement)) return;
+    conquistasRenderizadas.add(data.achievement);
 
     const box = document.createElement("div");
-    box.className = "achievement fade-in"; // Aplica fade-in aqui
+    box.className = "achievement fade-in";
     box.dataset.achievementId = data.achievement;
 
     const img = document.createElement("img");
@@ -258,8 +273,19 @@ function renderConquistas(appID) {
     info.className = "achievement-info";
 
     const title = document.createElement("div");
-    title.className = "achievement-title";
-    title.textContent = data.displayName;
+title.className = "achievement-title";
+
+let titleText = data.displayName;
+
+if (data.progress) {
+  const { current, max } = data.progress;
+  const porcentagem = Math.floor((current / max) * 100);
+  titleText += ` (${current}/${max} - ${porcentagem}%)`;
+}
+
+title.textContent = titleText;
+
+
 
     const desc = document.createElement("div");
     desc.className = "achievement-desc";
@@ -268,14 +294,23 @@ function renderConquistas(appID) {
     info.appendChild(title);
     info.appendChild(desc);
 
-    if (data.progress) {
-      const bar = document.createElement("div");
-      bar.className = "progress-bar";
-      const fill = document.createElement("div");
-      fill.className = "progress-fill";
-      fill.style.width = `${(data.progress.current / data.progress.max) * 100}%`;
-      bar.appendChild(fill);
-      info.appendChild(bar);
+     if (data.progress) {
+       const bar = document.createElement("div");
+       bar.className = "progress-bar";
+       const fill = document.createElement("div");
+       fill.className = "progress-fill";
+       fill.style.width = `${(data.progress.current / data.progress.max) * 100}%`;
+       bar.appendChild(fill);
+       info.appendChild(bar);
+     }
+
+
+    if (data.time) {
+      const timestampDiv = document.createElement("div");
+      timestampDiv.className = "achievement-timestamp";
+      const date = new Date(data.time * 1000);
+      timestampDiv.textContent = `🕒 Conquistado em: ${date.toLocaleString("pt-BR")}`;
+      info.appendChild(timestampDiv);
     }
 
     box.appendChild(img);
@@ -346,36 +381,19 @@ function renderConquistas(appID) {
 
   // Chamar ao carregar a página
   carregarLocal();
+  // Tenta carregar conquistas do servidor local, se estiver rodando
+fetch("http://localhost:3000/conquistas")
+  .then(res => res.json())
+  .then(data => {
+    console.log("📥 Conquistas importadas do servidor local");
+    Object.assign(conquistasPorJogo, data);
+    localStorage.setItem("conquistas", JSON.stringify(conquistasPorJogo));
+    renderGames();
+  })
+  .catch(err => {
+    console.log("⚠️ Nenhum servidor local encontrado. Usando apenas localStorage.");
+  });
 
-  // Salvar sempre que receber novas conquistas
-  ws.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      const appID = data.appID;
-      const game = data.game;
-
-      if (!conquistasPorJogo[appID]) {
-        conquistasPorJogo[appID] = {
-          game,
-          icon: data.icon,
-          conquistas: []
-        };
-        renderGames();
-      }
-
-      conquistasPorJogo[appID].conquistas.push(data);
-      salvarLocal(); // ← Salva localmente após novo dado
-
-      if (
-        achievementView.style.display === "grid" &&
-        achievementView.dataset.appID === String(appID)
-      ) {
-        renderConquistas(appID);
-      }
-    } catch (e) {
-      console.error("Erro ao processar conquista:", e);
-    }
-  };
   </script>
 </body>
 </html>
