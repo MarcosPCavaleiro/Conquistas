@@ -381,18 +381,6 @@ title.textContent = titleText;
 
   // Chamar ao carregar a página
   carregarLocal();
-  // Tenta carregar conquistas do servidor local, se estiver rodando
-fetch("http://localhost:3000/conquistas")
-  .then(res => res.json())
-  .then(data => {
-    console.log("📥 Conquistas importadas do servidor local");
-    Object.assign(conquistasPorJogo, data);
-    localStorage.setItem("conquistas", JSON.stringify(conquistasPorJogo));
-    renderGames();
-  })
-  .catch(err => {
-    console.log("⚠️ Nenhum servidor local encontrado. Usando apenas localStorage.");
-  });
 
   </script>
 </body>
