@@ -361,6 +361,7 @@ title.textContent = titleText;
 
   // Importar JSON
   document.getElementById("importFile").addEventListener("change", function () {
+    localStorage.removeItem("conquistas")	  
     const file = this.files[0];
     if (!file) return;
 
