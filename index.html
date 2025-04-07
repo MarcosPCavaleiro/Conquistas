@@ -201,15 +201,15 @@ footer {
     }
 
     const conquistas = conquistasPorJogo[appID].conquistas;
-    const indexExistente = conquistas.findIndex(c => c.achievement === data.achievement);
 
-    if (indexExistente !== -1) {
-      // Substitui a conquista existente
-      conquistas[indexExistente] = data;
-    } else {
-      // Adiciona nova conquista
-      conquistas.push(data);
-    }
+    // Remove a antiga, se existir
+    const semAntiga = conquistas.filter(c => c.achievement !== data.achievement);
+
+    // Adiciona a nova conquista no final (mais recente)
+    semAntiga.push(data);
+
+    // Atualiza a lista no objeto
+    conquistasPorJogo[appID].conquistas = semAntiga;
 
     salvarLocal(); // Atualiza localStorage com os dados corrigidos
 
