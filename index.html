@@ -200,8 +200,18 @@ footer {
       renderGames();
     }
 
-    conquistasPorJogo[appID].conquistas.push(data);
-    salvarLocal(); // Salva localmente após novo dado
+    const conquistas = conquistasPorJogo[appID].conquistas;
+    const indexExistente = conquistas.findIndex(c => c.achievement === data.achievement);
+
+    if (indexExistente !== -1) {
+      // Substitui a conquista existente
+      conquistas[indexExistente] = data;
+    } else {
+      // Adiciona nova conquista
+      conquistas.push(data);
+    }
+
+    salvarLocal(); // Atualiza localStorage com os dados corrigidos
 
     if (
       achievementView.style.display === "grid" &&
